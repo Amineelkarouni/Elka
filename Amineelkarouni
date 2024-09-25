@@ -1,0 +1,235 @@
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>كاميرا ويب مع تسجيل ورفع صورة</title>
+    <style>
+        body {
+            background-color: #1a1a1a; /* خلفية داكنة */
+            color: #ffffff; /* نص أبيض */
+            font-family: 'Courier New', Courier, monospace; /* نوع خط قديم */
+            text-align: center; /* توسيط النص */
+            padding: 20px; /* مسافة داخلية */
+            background-image: url('https://www.transparenttextures.com/patterns/numeric.png'); /* خلفية نيميريك */
+            margin: 0; /* إزالة الهوامش */
+        }
+        video {
+            width: 160px; /* عرض الفيديو أكبر قليلاً */
+            height: 120px; /* ارتفاع الفيديو أكبر قليلاً */
+            border: 1px solid #ffffff; /* حدود بيضاء */
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); /* ظل للفيديو */
+            margin: 20px 0; /* مسافة فوق وتحت الفيديو */
+        }
+        button, input[type="file"] {
+            margin: 10px; /* مسافة حول الأزرار */
+            background-color: #333; /* خلفية داكنة للأزرار */
+            color: #ffffff; /* نص أبيض للأزرار */
+            border: none; /* إزالة الحدود */
+            padding: 10px 15px; /* مساحة داخلية */
+            cursor: pointer; /* تغيير المؤشر عند المرور على الزر */
+            transition: background-color 0.3s; /* تأثير الانتقال */
+            font-family: 'Courier New', Courier, monospace; /* نوع خط قديم */
+            border-radius: 5px; /* زوايا دائرية */
+        }
+        button:hover, input[type="file"]:hover {
+            background-color: #555; /* لون أفتح عند التمرير */
+        }
+        a {
+            color: #bb86fc; /* لون رابط التحميل */
+            text-decoration: none; /* إزالة التسطير */
+            margin-top: 10px; /* مسافة فوق الرابط */
+            display: block; /* جعل الرابط كتلة */
+        }
+        #imageInfo {
+            margin-top: 10px; /* مسافة فوق معلومات الصورة */
+            color: #bb86fc; /* لون مختلف لمعلومات الصورة */
+            text-align: left; /* محاذاة النص إلى اليسار */
+            display: inline-block; /* جعل الحاوية كتلة لتحسين التنسيق */
+            max-width: 300px; /* عرض أقصى لمعلومات الصورة */
+            background-color: rgba(255, 255, 255, 0.1); /* خلفية شفافة */
+            padding: 10px; /* مساحة داخلية */
+            border-radius: 5px; /* زوايا دائرية */
+        }
+    </style>
+</head>
+<body>
+    <h1>كاميرا ويب مع تسجيل ورفع صورة</h1> <!-- عنوان الصفحة -->
+    <video id="video" autoplay muted></video>
+    <div>
+        <button id="toggleCamera">تبديل الكاميرا</button>
+        <button id="recordButton">تسجيل</button>
+        <button id="stopButton" disabled>إيقاف التسجيل</button>
+        <button id="muteButton">كتم الصوت</button>
+        <button id="captureButton">التقاط صورة</button>
+        <input type="file" id="fileInput" accept="image/*" />
+    </div>
+    <div id="imageInfo"></div> <!-- لعرض معلومات الصورة -->
+    <a id="downloadLink" style="display:none;">تحميل الفيديو</a>
+    
+    <script>
+        const video = document.getElementById('video');
+        const toggleCameraButton = document.getElementById('toggleCamera');
+        const recordButton = document.getElementById('recordButton');
+        const stopButton = document.getElementById('stopButton');
+        const muteButton = document.getElementById('muteButton');
+        const captureButton = document.getElementById('captureButton');
+        const fileInput = document.getElementById('fileInput');
+        const imageInfo = document.getElementById('imageInfo');
+        const downloadLink = document.getElementById('downloadLink');
+
+        let currentStream;
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isFrontCamera = true;
+        let isMuted = true;
+
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: isFrontCamera ? 'user' : 'environment'
+                    },
+                    audio: true // تمكين الصوت
+                };
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = currentStream;
+
+                // إعداد مسجل الوسائط
+                mediaRecorder = new MediaRecorder(currentStream);
+                mediaRecorder.ondataavailable = handleDataAvailable;
+                mediaRecorder.onstop = handleStop;
+            } catch (error) {
+                console.error('خطأ في الوصول إلى الكاميرا:', error);
+            }
+        }
+
+        function switchCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+            isFrontCamera = !isFrontCamera;
+            startCamera();
+        }
+
+        function handleDataAvailable(event) {
+            if (event.data.size > 0) {
+                recordedChunks.push(event.data);
+            }
+        }
+
+        function handleStop() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            downloadLink.href = url;
+            downloadLink.download = 'video.webm';
+            downloadLink.style.display = 'block';
+            downloadLink.textContent = 'تحميل الفيديو';
+            recordedChunks = []; // إعادة تعيين المصفوفة
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            currentStream.getAudioTracks().forEach(track => {
+                track.enabled = !isMuted;
+            });
+            muteButton.textContent = isMuted ? 'تشغيل الصوت' : 'كتم الصوت';
+        }
+
+        function captureImage() {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; // عرض الفيديو
+            canvas.height = video.videoHeight; // ارتفاع الفيديو
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'snapshot.png'; // اسم الصورة
+                link.click(); // بدء تحميل الصورة
+            }, 'image/png');
+        }
+
+        function getImageColors(image) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = image.width;
+                canvas.height = image.height;
+                context.drawImage(image, 0, 0);
+                const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+
+                const colors = {};
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+
+                    // تحديد الألوان الأساسية وفقاً للحدود المطلوبة
+                    const colorName = getColorName(r, g, b);
+                    if (colorName) {
+                        colors[colorName] = (colors[colorName] || 0) + 1;
+                    }
+                }
+
+                // فرز الألوان حسب التكرار
+                const sortedColors = Object.keys(colors).sort((a, b) => colors[b] - colors[a]);
+                resolve(sortedColors.slice(0, 5)); // أخذ الألوان الأكثر شيوعاً
+            });
+        }
+
+        function getColorName(r, g, b) {
+            const threshold = 40; // عتبة لتحديد الألوان
+            if (r > 200 && g < threshold && b < threshold) return "أحمر";
+            if (g > 200 && r < threshold && b < threshold) return "أخضر";
+            if (b > 200 && r < threshold && g < threshold) return "أزرق";
+            if (r > 200 && g > 200 && b < threshold) return "برتقالي";
+            if (r > 200 && g > 200 && b > 200) return "أبيض";
+            if (r < threshold && g < threshold && b < threshold) return "أسود";
+            return null; // إذا لم يتطابق مع أي لون
+        }
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const img = new Image();
+                img.src = URL.createObjectURL(file);
+                img.onload = async () => {
+                    // عرض معلومات الصورة
+                    const fileSize = (file.size / 1024).toFixed(2); // تحويل الحجم إلى كيلوبايت
+                    const dimensions = `${img.width}x${img.height}`; // الأبعاد
+                    const colors = await getImageColors(img); //الحصول على الألوان
+                    imageInfo.innerHTML = `
+                        <strong>اسم الصورة:</strong> ${file.name}<br>
+                        <strong>حجم الصورة:</strong> ${fileSize} كيلوبايت<br>
+                        <strong>أبعاد الصورة:</strong> ${dimensions}<br>
+                        <strong>الألوان الأساسية:</strong> ${colors.join(', ')}
+                    `;
+                };
+            }
+        });
+
+        recordButton.addEventListener('click', () => {
+            recordedChunks = []; // إعادة تعيين المصفوفة عند بدء التسجيل
+            mediaRecorder.start();
+            recordButton.disabled = true;
+            stopButton.disabled = false;
+        });
+
+        stopButton.addEventListener('click', () => {
+            mediaRecorder.stop();
+            recordButton.disabled = false;
+            stopButton.disabled = true;
+        });
+
+        toggleCameraButton.addEventListener('click', switchCamera);
+        muteButton.addEventListener('click', toggleMute);
+        captureButton.addEventListener('click', captureImage);
+
+        // بدء الكاميرا عند تحميل الصفحة
+        startCamera();
+    </script>
+</body>
+</html>
